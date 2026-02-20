@@ -10,13 +10,13 @@ st.title("📊 Dashboard Analisis Dataset")
 # Load dataset
 @st.cache_data
 def load_data():
-    return pd.read_csv("dataset.csv")
-
-try:
-    df = load_data()
-except FileNotFoundError:
-    st.error("File dataset.csv tidak ditemukan. Pastikan file ada di folder yang sama.")
-    st.stop()
+    try:
+        return pd.read_csv("dataset.csv", encoding="utf-8")
+    except:
+        try:
+            return pd.read_csv("dataset.csv", encoding="latin1")
+        except:
+            return pd.read_csv("dataset.csv", sep=";")
 
 # Tampilkan data
 st.subheader("Preview Dataset")
