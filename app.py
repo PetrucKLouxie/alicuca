@@ -2,50 +2,83 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="Dashboard Analisis Dataset", layout="wide")
+st.set_page_config(page_title="Trend Analisis Cuaca", layout="wide")
 
-st.title("📊 Dashboard Analisis Dataset")
+st.title("🌦️ Trend Analisis Cuaca")
 
-@st.cache_data
-def load_data():
+# Upload file
+uploaded_file = st.file_uploader("Upload Dataset Cuaca (CSV)", type=["csv"])
+
+if uploaded_file is not None:
     try:
-        return pd.read_csv("dataset.csv", encoding="utf-8")
-    except:
-        try:
-            return pd.read_csv("dataset.csv", encoding="latin1")
-        except:
-            return pd.read_csv("dataset.csv", sep=";")
+        df = pd.read_csv(uploaded_file)
 
-# Load dataset
-try:
-    df = load_data()
-except Exception as e:
-    st.error(f"Gagal membaca dataset: {e}")
-    st.stop()
+        # Ubah kolom tanggal jadi datetime
+        df['time (UTC)'] = pd.to_datetime(df['date'])
 
-# Jika berhasil lanjut
-st.subheader("Preview Dataset")
-st.dataframe(df)
+        st.success("Dataset berhasil dimuat ✅")
 
-st.subheader("Informasi Dataset")
-col1, col2, col3 = st.columns(3)
-col1.metric("Jumlah Baris", df.shape[0])
-col2.metric("Jumlah Kolom", df.shape[1])
-col3.metric("Missing Values", df.isnull().sum().sum())
+        # Sort berdasarkan tanggal
+        df = df.sort_values('date')
 
-numeric_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+        st.subheader("Preview Data")
+        st.dataframe(df.head())
 
-if numeric_columns:
-    st.subheader("Visualisasi Data")
-    selected_column = st.selectbox("Pilih kolom numerik", numeric_columns)
+        # =========================
+        # 📈 Trend Line Chart
+        # =========================
+        st.subheader("📈 Trend Cuaca Harian")
 
-    fig = px.histogram(df, x=selected_column, title=f"Distribusi {selected_column}")
-    st.plotly_chart(fig, use_container_width=True)
+        weather_columns = df.select_dtypes(include=['int64','float64']).columns.tolist()
 
-    fig_box = px.box(df, y=selected_column, title=f"Boxplot {selected_column}")
-    st.plotly_chart(fig_box, use_container_width=True)
+        selected_metric = st.selectbox(
+            "Pilih Parameter Cuaca",
+            weather_columns
+        )
+
+        fig = px.line(
+            df,
+            x="date",
+            y=selected_metric,
+            title=f"Trend {selected_metric} terhadap Waktu",
+            markers=True
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # =========================
+        # 📊 Moving Average
+        # =========================
+        st.subheader("📊 Moving Average (Rata-rata Bergerak)")
+
+        window = st.slider("Pilih Window (hari)", 3, 30, 7)
+
+        df[f"{selected_metric}_MA"] = df[selected_metric].rolling(window=window).mean()
+
+        fig_ma = px.line(
+            df,
+            x="date",
+            y=[selected_metric, f"{selected_metric}_MA"],
+            title=f"Trend & Moving Average ({window} Hari)"
+        )
+
+        st.plotly_chart(fig_ma, use_container_width=True)
+
+        # =========================
+        # 🌧️ Total Curah Hujan
+        # =========================
+        if "rainfall" in df.columns:
+            st.subheader("🌧️ Total Curah Hujan")
+
+            total_rain = df["rainfall"].sum()
+            avg_rain = df["rainfall"].mean()
+
+            col1, col2 = st.columns(2)
+            col1.metric("Total Curah Hujan", f"{total_rain:.2f}")
+            col2.metric("Rata-rata Harian", f"{avg_rain:.2f}")
+
+    except Exception as e:
+        st.error(f"Terjadi kesalahan: {e}")
+
 else:
-    st.warning("Tidak ada kolom numerik untuk divisualisasikan.")
-
-st.subheader("Statistik Deskriptif")
-st.write(df.describe())
+    st.info("Silakan upload dataset CSV untuk memulai analisis.")
